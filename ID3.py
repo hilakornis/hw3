@@ -16,7 +16,11 @@ def compute_h(data):
     healthy = np.sum(data[:, 0])
     sick = len(data) - healthy
     total = len(data)
-    assert total > 0
+    if total == 0 :
+        return 0
+    # assert total > 0
+
+
     # print(total)
     h_healthy = healthy / total
     h_sick = sick / total
@@ -64,13 +68,14 @@ def find_best_feature_threshold_per(data):
 
         for s_index in range(num_samples - 1):
 
-            print()
-            print(s_index, f_index)
-            print(data[s_index - 1, f_index])
-            print(data[s_index, f_index])
-            print(data[s_index + 1, f_index])
+            # print()
+            # print(s_index, f_index)
+            # print(data[s_index - 1, f_index])
+            # print(data[s_index, f_index])
+            # print(data[s_index + 1, f_index])
 
             threshold = (data[s_index,f_index] + data[s_index + 1,f_index])/2
+            # print('this is threshold ',threshold)
             ig = compute_IG_for_feature_threhold(data,threshold , f_index)
 
             if best_ig < ig:
