@@ -84,6 +84,8 @@ class Node:
     def __init__(self, data, features, parent=None, default_value=0):
 
         # todo remove the 3 lines below
+
+
         self.trues = -1
         if len(data) != 0:
             self.trues = [np.sum(data[:,0])/len(data), len(data), len(features)]
@@ -113,10 +115,10 @@ class Node:
         self.h = compute_h(data)
 
         if not self.leaf:
-            self.threshold, self.feature_index = self.split(data)
+            self.threshold, self.feature_index = self.split(data, default_value)
 
 
-    def split(self, data):
+    def split(self, data, default_value):
 
         if self.leaf:
             return None, None
@@ -128,8 +130,8 @@ class Node:
         split2 = data[data[:, feature] > threshold]
 
         self.children = [
-            Node(split1, self.features, self, self.default_value),
-            Node(split2, self.features, self, self.default_value)
+            Node(split1, self.features, self, default_value),
+            Node(split2, self.features, self, default_value)
         ]
 
         return threshold, feature
