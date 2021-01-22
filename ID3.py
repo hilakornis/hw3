@@ -138,16 +138,12 @@ class Node:
         if self.leaf:
             return self.default_value
 
-        # print(data.shape, len(data))
-
         if len(data.shape) == 1:
             if data[self.feature_index] <= self.threshold:
                 pred = self.children[0].predict(data)
             else:
                 pred = self.children[1].predict(data)
-
             return pred
-
 
         predictions = []
         if len(data.shape) > 1:
@@ -173,19 +169,21 @@ class Node:
 
 data_train = get_data("train.csv")
 
-
 num_samples, num_features = data_train.shape
 num_features -= 1
 set_features = set(range(1,num_features))
 
 tree = Node(data_train, set_features)
 
+# train predictions
+data_train = get_data("train.csv")
+labels = data_train[:,0]
+predictions = np.array(tree.predict(data_train))
+print("accuracy on train set", np.sum(labels == predictions)/len(predictions))
 
-print(tree.predict(data_train))
-print([int(k) for k in data_train[:,0]])
-
-print()
-
+# test_predictions
 data_test = get_data("test.csv")
-print(tree.predict(data_test))
-print([int(k) for k in data_test[:,0]])
+labels = data_test[:,0]
+predictions = np.array(tree.predict(data_test))
+print("accuracy on test set", np.sum(labels == predictions)/len(predictions))
+print(np.sum(labels == predictions)," predictions were correct, out of: ",len(predictions))
