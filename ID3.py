@@ -1,6 +1,8 @@
 import numpy as np
 import pandas as pd
 
+from sklearn.model_selection import KFold
+
 def dataframe_to_numpy(df):
     df['diagnosis'] = df['diagnosis'].replace(['M','B'],[0.,1.])
     return df.to_numpy()
@@ -81,11 +83,11 @@ def find_best_feature_threshold_per(data,features_set):
 
 class Node:
 
-    def __init__(self, data, features, parent=None, default_value=0):
+    def __init__(self, data, features, parent=None, default_value=0, M=-1):
 
         # todo remove the 3 lines below
 
-
+        self.m = M
         self.trues = -1
         if len(data) != 0:
             self.trues = [np.sum(data[:,0])/len(data), len(data), len(features)]
@@ -97,7 +99,7 @@ class Node:
         self.threshold = None
         self.feature_index = None
 
-        if len(data) == 0 or len(self.features) == 0 :
+        if len(data) == 0:
             self.leaf = True
             self.default_value = default_value
 
@@ -106,15 +108,25 @@ class Node:
 
             return
 
+        if len(self.features) == 0:
+
+            self.leaf = True
+            self.default_value = 1 if np.sum(data[:, 0]) >= (len(data) / 2) else 0
+
+            if len(data) > 0:
+                self.h = compute_h(data)
+
+            return
+
         healthy_leaf = np.sum(data[:,0]) == len(data)
         sick_leaf = np.sum(data[:,0]) == 0
-
         self.leaf = (healthy_leaf or sick_leaf)
+
         self.default_value = 1 if np.sum(data[:, 0]) >= (len(data)/2) else 0
 
         self.h = compute_h(data)
 
-        if not self.leaf:
+        if not self.leaf and self.split_condition(data):
             self.threshold, self.feature_index = self.split(data, default_value)
 
 
@@ -130,13 +142,13 @@ class Node:
         split2 = data[data[:, feature] > threshold]
 
         self.children = [
-            Node(split1, self.features, self, default_value),
-            Node(split2, self.features, self, default_value)
+            Node(split1, self.features, self, default_value, M=self.m),
+            Node(split2, self.features, self, default_value, M=self.m)
         ]
 
         return threshold, feature
 
-    def predict(self, data):
+    def predict(self, data): #the Node data structure is initialize with the feature set, and arguments it according to it's progression.
         if self.leaf:
             return self.default_value
 
@@ -160,6 +172,11 @@ class Node:
 
         return predictions
 
+    def split_condition(self, data):
+        if len(data) <= self.m and self.m != -1:
+            return False
+        return True
+
     def traverse(self, depth=0):
         print(self, "\n depth: ", depth)
         print()
@@ -169,23 +186,67 @@ class Node:
     def __str__(self):
         return 'feature: {}\n threshold {}\n leaf {}\n trues {}'.format(self.feature_index, self.threshold, self.leaf, self.trues)
 
+
+
+def get_k_fold_validation(data_train):
+    index_array = [sp for sp in KFold(n_splits=5, random_state=203439989, shuffle=True).split(data_train)]
+    validation_folds = [np.concatenate([[data_train[i]] for i in index_array[j][1]]) for j in range(len(index_array))]
+    train_folds = [np.concatenate([[data_train[i]] for i in index_array[j][0]]) for j in range(len(index_array))]
+    return train_folds, validation_folds
+
+
+def get_id3_tree_from(data_train , M=-1):
+    num_samples, num_features = data_train.shape
+    num_features -= 1
+    set_features = list(range(1, num_features))
+    if M==-1:
+        tree = Node(data_train, set_features)
+    else:
+        tree = Node(data_train, set_features,M)
+    return tree
+
+
+def test_id3_q1(data_train, data_test):
+    # data_train = get_data("train.csv")
+    # train predictions
+    tree = get_id3_tree_from(data_train)
+
+    # data_train = get_data("train.csv")
+    # labels = data_train[:,0]
+    # predictions = np.array(tree.predict(data_train))
+    # print("accuracy on train set", np.sum(labels == predictions)/len(predictions))
+
+    # test_predictions
+    # data_test = get_data("test.csv")
+    labels = data_test[:, 0]
+    predictions = np.array(tree.predict(data_test))
+    print("accuracy on test set", np.sum(labels == predictions) / len(predictions))
+    print(np.sum(labels == predictions), " predictions were correct, out of: ", len(predictions))
+
+def test_id3_q3(data_train):
+    # data_train = get_data("train.csv")
+    # train predictions
+    train_folds, validation_folds = get_k_fold_validation(data_train)
+
+    m_array = [1, 2 , 3, 4, 5]
+
+    for i in range(5):
+        tree = get_id3_tree_from(train_folds[i], 5)
+        labels = validation_folds[i][:, 0]
+        predictions = np.array(tree.predict(validation_folds[i]))
+        print('\ni: ',i, ' m is: ',m_array[i])
+        print("accuracy on test set", np.sum(labels == predictions) / len(predictions))
+        print(np.sum(labels == predictions), " predictions were correct, out of: ", len(predictions))
+
+    return
+
 data_train = get_data("train.csv")
-
-num_samples, num_features = data_train.shape
-num_features -= 1
-set_features = set(range(1,num_features))
-
-tree = Node(data_train, set_features)
-
-# train predictions
-data_train = get_data("train.csv")
-labels = data_train[:,0]
-predictions = np.array(tree.predict(data_train))
-print("accuracy on train set", np.sum(labels == predictions)/len(predictions))
-
-# test_predictions
 data_test = get_data("test.csv")
-labels = data_test[:,0]
-predictions = np.array(tree.predict(data_test))
-print("accuracy on test set", np.sum(labels == predictions)/len(predictions))
-print(np.sum(labels == predictions)," predictions were correct, out of: ",len(predictions))
+test_id3_q1(data_train,data_test)
+# test_id3_q3(data_train)
+
+
+# index_array= [sp for sp in KFold(n_splits=5, random_state=203439989, shuffle=True).split(data_train)]
+# validation_folds = [np.concatenate([[data_train[i]] for i in index_array[j][1]]) for j in range(len(index_array))]
+# train_folds = [np.concatenate([[data_train[i]] for i in index_array[j][0]]) for j in range(len(index_array))]
+# print(train_folds[-1].shape)
