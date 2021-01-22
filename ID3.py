@@ -83,11 +83,12 @@ def find_best_feature_threshold_per(data,features_set):
 
 class Node:
 
-    def __init__(self, data, features, parent=None, default_value=0, M=-1):
+    def __init__(self, data, features, parent=None, default_value=0, m=-1):
 
         # todo remove the 3 lines below
+        # print('in node init: ',m)
+        self.m = m
 
-        self.m = M
         self.trues = -1
         if len(data) != 0:
             self.trues = [np.sum(data[:,0])/len(data), len(data), len(features)]
@@ -96,7 +97,7 @@ class Node:
         self.features = features
         self.children = []
         self.h = 0
-        self.threshold = None
+        self.threshold = 0
         self.feature_index = None
 
         if len(data) == 0:
@@ -142,10 +143,11 @@ class Node:
         split2 = data[data[:, feature] >= threshold]
 
         self.children = [
-            Node(split1, self.features, self, default_value, M=self.m),
-            Node(split2, self.features, self, default_value, M=self.m)
+            Node(split1, self.features, self, default_value, m=self.m),
+            Node(split2, self.features, self, default_value, m=self.m)
         ]
-        # self.features.append(feature)
+        self.features.append(feature)
+        # assert (threshold != None)
         return threshold, feature
 
     def predict(self, data): #the Node data structure is initialize with the feature set, and arguments it according to it's progression.
@@ -153,6 +155,7 @@ class Node:
             return self.default_value
 
         if len(data.shape) == 1:
+
             if data[self.feature_index] <= self.threshold:
                 pred = self.children[0].predict(data)
             else:
@@ -174,6 +177,7 @@ class Node:
 
     def split_condition(self, data):
         if len(data) <= self.m and self.m != -1:
+            print(self.m)
             return False
         return True
 
@@ -202,7 +206,8 @@ def get_id3_tree_from(data_train , M=-1):
     if M==-1:
         tree = Node(data_train, set_features)
     else:
-        tree = Node(data_train, set_features,M)
+        # print(M)
+        tree = Node(data_train, set_features,m=M)
     return tree
 
 
@@ -220,7 +225,7 @@ def test_id3_q1(data_train, data_test):
     # data_test = get_data("test.csv")
     labels = data_test[:, 0]
     predictions = np.array(tree.predict(data_test))
-    print("accuracy on test set", np.sum(labels == predictions) / len(predictions))
+    print("Accuracy on test set", np.sum(labels == predictions) / len(predictions))
     print(np.sum(labels == predictions), " predictions were correct, out of: ", len(predictions))
 
 def test_id3_q3(data_train):
@@ -228,16 +233,20 @@ def test_id3_q3(data_train):
     # train predictions
     train_folds, validation_folds = get_k_fold_validation(data_train)
 
-    m_array = [1, 2 , 3, 4, 5]
+    m_array = [1, 2, 3, 4, 5]
 
-    for i in range(5):
-        tree = get_id3_tree_from(train_folds[i], 5)
-        labels = validation_folds[i][:, 0]
-        predictions = np.array(tree.predict(validation_folds[i]))
-        print('\ni: ',i, ' m is: ',m_array[i])
-        print("accuracy on test set", np.sum(labels == predictions) / len(predictions))
-        print(np.sum(labels == predictions), " predictions were correct, out of: ", len(predictions))
 
+    for j in range(5):
+        accuracy_results = []
+        for i in range(5):
+            tree = get_id3_tree_from(train_folds[i],M= m_array[j])
+            labels = validation_folds[i][:, 0]
+            predictions = np.array(tree.predict(validation_folds[i]))
+            accuracy_results.append(np.sum(labels == predictions) / len(predictions))
+
+        print('\ni: ', j, ' m is: ', m_array[j])
+        print("Accuracy on test is:", np.average(accuracy_results))
+        # print(np.sum(labels == predictions), " predictions were correct, out of: ", len(predictions))
     return
 
 data_train = get_data("train.csv")
