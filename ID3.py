@@ -73,7 +73,7 @@ def find_best_feature_threshold_per(data,features_set):
 
             ig = compute_IG_for_feature_threhold(data,threshold , f_index)
 
-            if best_ig < ig:
+            if best_ig <= ig:
                 best_ig = ig
                 best_threshold = threshold
                 best_feature = f_index
@@ -127,7 +127,7 @@ class Node:
         self.h = compute_h(data)
 
         if not self.leaf and self.split_condition(data):
-            self.threshold, self.feature_index = self.split(data, default_value)
+            self.threshold, self.feature_index = self.split(data, self.default_value)
 
 
     def split(self, data, default_value):
@@ -138,14 +138,14 @@ class Node:
         ig, feature, threshold = find_best_feature_threshold_per(data, self.features)
         self.features.remove(feature)
 
-        split1 = data[data[:, feature] <= threshold]
-        split2 = data[data[:, feature] > threshold]
+        split1 = data[data[:, feature] < threshold]
+        split2 = data[data[:, feature] >= threshold]
 
         self.children = [
             Node(split1, self.features, self, default_value, M=self.m),
             Node(split2, self.features, self, default_value, M=self.m)
         ]
-
+        # self.features.append(feature)
         return threshold, feature
 
     def predict(self, data): #the Node data structure is initialize with the feature set, and arguments it according to it's progression.
