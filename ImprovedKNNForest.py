@@ -25,7 +25,7 @@ def compute_h(data):
     h_healthy = healthy / total
     h_sick = sick / total
 
-    healthy_part = 0.1*h_healthy * np.log2(h_healthy) if h_healthy != 0 else 0
+    healthy_part = h_healthy * np.log2(h_healthy) if h_healthy != 0 else 0
     sick_part = h_sick * np.log2(h_sick) if h_sick != 0 else 0
 
     h = -(healthy_part + sick_part)
@@ -88,6 +88,7 @@ class Node:
 
         # todo remove the 3 lines below
 
+        self.average_sample = np.sum(data,axis=0)/len(data)
         self.m = M
         self.trues = -1
         if len(data) != 0:
@@ -194,8 +195,8 @@ class Node:
 
 
 
-def get_k_fold_validation(data_train):
-    index_array = [sp for sp in KFold(n_splits=5, random_state=203439989, shuffle=True).split(data_train)]
+def get_k_fold_validation(data_train, n_splits=5):
+    index_array = [sp for sp in KFold(n_splits=n_splits, random_state=203439989, shuffle=True).split(data_train)]
     validation_folds = [np.concatenate([[data_train[i]] for i in index_array[j][1]]) for j in range(len(index_array))]
     train_folds = [np.concatenate([[data_train[i]] for i in index_array[j][0]]) for j in range(len(index_array))]
     return train_folds, validation_folds
@@ -239,35 +240,21 @@ def experiment(data_train):
     train_folds, validation_folds = get_k_fold_validation(data_train)
 
     m_array = [1, 3, 5, 10, 13]
-    loss_results = []
-    for j in range(5):
-        loss_clac = []
+    results = []
 
+    for j in range(5):
+        accuracy_results = []
         for i in range(5):
             tree = get_id3_tree_from(train_folds[i],M= m_array[j])
             labels = validation_folds[i][:, 0]
             predictions = np.array(tree.predict(validation_folds[i]))
-            # accuracy_results.append(np.sum(labels == predictions) / len(predictions))
+            accuracy_results.append(np.sum(labels == predictions) / len(predictions))
 
-            n = len(predictions)
-            fp = 0
-            fn = 0
-            for i in range(n):
-                if (labels[i] == 1 and predictions[i] == 0):
-                    fn += 1
-                elif labels[i] == 0 and predictions[i] == 1:
-                    fp += 1
-            loss = (0.1 * fp + fn) / n
-            loss_clac.append(loss)
-
-        # print('\ni: ', j, ' m is: ', m_array[j])
-        # print("Accuracy on test is:", np.average(accuracy_results))
-        # acc_results.append(np.average(accuracy_results))
-        loss_results.append(np.average(loss_clac))
+        print('\ni: ', j, ' m is: ', m_array[j])
+        print("Accuracy on test is:", np.average(accuracy_results))
+        results.append(np.average(accuracy_results))
         # print(np.sum(labels == predictions), " predictions were correct, out of: ", len(predictions))
-    # plt.plot(m_array,acc_results)
-    # plt.show()
-    plt.plot(m_array, loss_results)
+    plt.plot(m_array,results)
     plt.show()
     return
 
@@ -318,14 +305,177 @@ def test_id3_q4(data_train, data_test):
     print("The loss is: ",loss)
     # print(np.sum(labels == predictions), " predictions were correct, out of: ", len(predictions))
 
+def rand_samples_choice(data, n_trees, p):
+
+    training_data_list = []
+
+    for i in range(n_trees):
+        n = len(data)
+        indices = np.random.choice(n, int(n*p), replace=False)
+        training_data_list.append(data[indices])
+
+    return training_data_list
+
+class KNN_forest:
+
+    def __init__(self, data_train, n_trees=5, k=3, p=0.5):
+
+        # train_folds, validation_folds = get_k_fold_validation(data_train, n_trees)
+        fold = rand_samples_choice(data_train, n_trees, p)
+
+        # print("fold ",fold[0].shape, type(fold), len(fold))
+
+        self.k = k
+
+        self.trees = []
+        self.avg_sample = []
+        for i in range(n_trees):
+
+            num_samples, num_features = fold[i].shape
+            set_features = list(range(1, num_features - 1))
+
+            tree = Node(fold[i], set_features)
+            self.trees.append(tree)
+            self.avg_sample.append(np.sum(fold[i], axis=0)/len(fold[i]))
+
+        self.avg_sample = np.array(self.avg_sample)
+
+    def predict(self, data_p):
+
+        results = []
+
+        if len(data_p.shape) == 1:
+            data_p = np.expand_dims(data_p, 0)
+
+        for data in data_p:
+
+            # find out which trees to use
+
+            distance = np.sum((self.avg_sample[:, 1:] - data[1:])**2, axis=1) # no need to compute root we only want the K best
+            best_distances_indexes = np.argsort(distance)[:self.k]
+            arr_with_k_vals = distance[best_distances_indexes]
+
+
+            # use k closest trees to compute
+
+            k_tree_results = []
+            for index in best_distances_indexes:
+                # tree_result = self.trees[index].predict(data)
+                tree_result = (self.trees[index].predict(data)*2 - 1) * (1/distance[index])
+                k_tree_results.append(tree_result)
+
+            k_tree_results = np.array(k_tree_results)
+            result = 1 if np.sum(k_tree_results) > 0 else 0
+
+            results.append(result)
+
+        return results
+
+        # for tree in self.trees:
+        #     print(tree.predict(data))
+
+
+
+def find_best_knn_parameters(data_train, data_test):
+
+
+    n = len(data_train[:, 0])
+    print(n)
+
+    prediction_accuracy_max = 0
+    max_p = 0
+    max_n_trees = 1
+    max_k = 1
+    p0 = 0.5
+    while p0<=0.7:
+        N = int(p0*n)
+        for i in range(2,N+1,2):
+            # print('i: ',i)
+            for n_trees in range(1,N+1):
+                # print('n_trees: ', n_trees)
+                for k in range(1,n_trees+1):
+                    # print('k: ', k)
+                    forest = KNN_forest(data_train, n_trees=n_trees, k=k, p=p0)
+                    results = np.array(forest.predict(data_test))
+                    labels = np.array([int(k) for k in data_test[:, 0]])
+                    prediction_acuracy = np.sum(labels == results) / len(results)
+                    # print("predictions: ", prediction_acuracy)
+                    if prediction_accuracy_max <= prediction_acuracy:
+                        print('------------ In Max! ------------')
+                        prediction_accuracy_max = prediction_acuracy
+                        max_p = p0
+                        max_k = k
+                        max_n_trees = n_trees
+                        print('this is max_p: ', max_p, '\nthis is max_k: ', max_k, '\nthis is max_n_trees: ',
+                              max_n_trees,
+                              '\nthis is prediction_accuracy_max: ', prediction_accuracy_max)
+
+        p0 += 0.05
+    return max_p, max_k, max_n_trees, prediction_accuracy_max
+
+
+
 
 data_train = get_data("train.csv")
 data_test = get_data("test.csv")
+
+# max_p, max_k, max_n_trees, prediction_accuracy_max = find_best_knn_parameters(data_train, data_test)
+#
+# print('---- Done! ----')
+# print('this is max_p: ',max_p,'\nthis is max_k: ',max_k,'\nthis is max_n_trees: ',max_n_trees,
+#       '\nthis is prediction_accuracy_max: ',prediction_accuracy_max)
+
+data_train_no_label =data_train[:,1:]
+print(data_train_no_label.shape[1])
+
+train_max = np.max(data_train_no_label,axis=0)
+train_min = np.min(data_train_no_label,axis=0)
+
+data_train_normolized = np.copy(data_train)
+data_train_normolized[:,1:] = (data_train[:,1:] - train_min)/(train_max - train_min)
+
+data_test_normolized = np.copy(data_test)
+data_test_normolized[:,1:] = (data_test[:,1:] - train_min)/(train_max - train_min)
+
+max_p, max_k, max_n_trees, prediction_accuracy_max = find_best_knn_parameters(data_train_normolized, data_test_normolized)
+print('---- Done! ----')
+print('this is max_p: ',max_p,'\nthis is max_k: ',max_k,'\nthis is max_n_trees: ',max_n_trees,
+      '\nthis is prediction_accuracy_max: ',prediction_accuracy_max)
+
+# print(test_id3_q3(data_train_normolized, data_test_normolized))
+
+# min_features = []
+# max_features = []
+#
+# for i in range(data_train_no_label.shape[1]):
+#     min_features.append(min(data_train_no_label[:,i]))
+#     max = -np.inf
+
+
+
 # test_id3_q1(data_train,data_test)
-experiment(data_train)
+# experiment(data_train)
 # test_id3_q4(data_train,data_test)
 
 # index_array= [sp for sp in KFold(n_splits=5, random_state=203439989, shuffle=True).split(data_train)]
 # validation_folds = [np.concatenate([[data_train[i]] for i in index_array[j][1]]) for j in range(len(index_array))]
 # train_folds = [np.concatenate([[data_train[i]] for i in index_array[j][0]]) for j in range(len(index_array))]
 # print(train_folds[-1].shape)
+
+
+
+# forest = KNN_forest(data_train,n_trees=150, k=3, p=0.7)
+#
+# results = np.array(forest.predict(data_test))
+# labels = np.array([int(k) for k in data_test[:,0]])
+# prediction_accuracy = np.sum(labels == results)/len(results)
+
+
+# print("predictions: ", prediction_accuracy)
+
+# a = np.arange(10*31).reshape(10,31)
+# b = np.random.choice(10,3,replace=False)
+# print(a,b)
+# print(a.shape)
+# print(a[b].shape)
+# print(a[b])

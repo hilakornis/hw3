@@ -307,9 +307,9 @@ def test_id3_q4(data_train, data_test):
 
 data_train = get_data("train.csv")
 data_test = get_data("test.csv")
-# test_id3_q1(data_train,data_test)
+test_id3_q1(data_train,data_test)
 # experiment(data_train)
-test_id3_q4(data_train,data_test)
+# test_id3_q4(data_train,data_test)
 
 # index_array= [sp for sp in KFold(n_splits=5, random_state=203439989, shuffle=True).split(data_train)]
 # validation_folds = [np.concatenate([[data_train[i]] for i in index_array[j][1]]) for j in range(len(index_array))]
